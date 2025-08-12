@@ -1,1 +1,53 @@
+- hosts: all
+  become: yes
+  tasks:
+    - name: Create node_exporter user
+      ansible.builtin.user:
+        name: node_exporter
+        shell: /usr/sbin/nologin
+        system: yes
 
+    - name: Download node_exporter
+      ansible.builtin.get_url:
+        url: "https://github.com/prometheus/node_exporter/releases/download/v1.7.1/node_exporter-1.7.1.linux-amd64.tar.gz"
+        dest: /tmp/node_exporter.tar.gz
+        mode: '0644'
+
+    - name: Extract
+      ansible.builtin.unarchive:
+        src: /tmp/node_exporter.tar.gz
+        dest: /usr/local/bin
+        remote_src: yes
+        creates: /usr/local/bin/node_exporter-1.7.1.linux-amd64
+
+    - name: Move binary
+      ansible.builtin.command: mv /usr/local/bin/node_exporter-1.7.1.linux-amd64/node_exporter /usr/local/bin/node_exporter
+      args: creates=/usr/local/bin/node_exporter
+
+    - name: Ensure permissions
+      ansible.builtin.file:
+        path: /usr/local/bin/node_exporter
+        owner: node_exporter
+        group: node_exporter
+        mode: '0755'
+
+    - name: Install systemd unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/node_exporter.service
+        content: |
+          [Unit]
+          Description=Prometheus Node Exporter
+          After=network.target
+
+          [Service]
+          User=node_exporter
+          ExecStart=/usr/local/bin/node_exporter
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Start node_exporter
+      ansible.builtin.systemd:
+        name: node_exporter
+        enabled: yes
+        state: started
