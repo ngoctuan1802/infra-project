@@ -6,3 +6,6 @@ path: ./infra/terraform/terraform.tfstate
 #   bucket: my-terraform-state
 #   key: network/terraform.tfstate
 #   region: ap-southeast-1
+
+
+# Command: ansible-inventory -i inventory_terraform.yml --list
