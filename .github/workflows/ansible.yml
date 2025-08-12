@@ -1,0 +1,32 @@
+name: Ansible Config
+
+on:
+  workflow_dispatch:  # cho phép chạy thủ công
+  workflow_call:      # cho phép gọi từ workflow khác
+
+jobs:
+  ansible:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download terraform outputs
+        uses: actions/download-artifact@v4
+        with:
+          name: tfoutputs
+          path: .
+
+      - name: Generate inventory
+        run: |
+          echo "[nodes]" > infra/ansible/hosts.ini
+          jq -r '.instance_public_ips.value[]' tfoutputs.json | while read ip; do
+            echo "$ip ansible_user=ubuntu ansible_ssh_private_key_file=/home/runner/.ssh/id_rsa" >> infra/ansible/hosts.ini
+          done
+
+      - name: Install Ansible
+        run: sudo apt-get update && sudo apt-get install -y ansible
+
+      - name: Run playbook
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: "False"
+        run: ansible-playbook -i infra/ansible/hosts.ini infra/ansible/playbook.yml
