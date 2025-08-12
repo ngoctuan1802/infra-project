@@ -1,0 +1,13 @@
+# inventory_aws_ec2.yml
+plugin: amazon.aws.aws_ec2
+regions:
+  - ap-southeast-1
+filters:
+  tag:Name: "node-exporter-*"
+keyed_groups:
+  - key: tags.Name
+hostnames:
+  - public_ip_address
+compose:
+  ansible_user: ubuntu
+  ansible_ssh_private_key_file: /path/to/key.pem
