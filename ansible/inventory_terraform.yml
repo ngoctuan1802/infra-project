@@ -1,0 +1,8 @@
+plugin: community.general.terraform_state
+# Đường dẫn tới state file local
+path: ./infra/terraform/terraform.tfstate
+# Hoặc backend remote
+# backend_config:
+#   bucket: my-terraform-state
+#   key: network/terraform.tfstate
+#   region: ap-southeast-1
