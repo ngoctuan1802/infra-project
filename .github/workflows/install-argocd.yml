@@ -1,0 +1,52 @@
+name: Install ArgoCD on EKS
+
+on:
+  workflow_dispatch:
+
+jobs:
+  install-argocd:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # 1. Cài kubectl & awscli
+      - name: Install kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+
+      - name: Install AWS CLI
+        run: |
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          sudo ./aws/install
+
+      # 2. Lấy kubeconfig từ EKS
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-southeast-1   # chỉnh region cho đúng
+
+      - name: Update kubeconfig for EKS
+        run: |
+          aws eks update-kubeconfig \
+            --name my-eks-cluster \       # tên EKS đã tạo bằng Terraform
+            --region ap-southeast-1
+
+      # 3. Cài ArgoCD
+      - name: Install ArgoCD
+        run: |
+          kubectl create namespace argocd || true
+          kubectl apply -n argocd \
+            -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+      # 4. Expose ArgoCD (tùy chọn - LoadBalancer)
+      - name: Expose ArgoCD server
+        run: |
+          kubectl patch svc argocd-server -n argocd \
+            -p '{"spec": {"type": "LoadBalancer"}}'
