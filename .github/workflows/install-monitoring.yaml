@@ -1,0 +1,69 @@
+name: Install Monitoring on EKS
+
+on:
+  workflow_dispatch: # Chạy thủ công hoặc trigger từ workflow build EKS
+  workflow_call:
+
+jobs:
+  install-monitoring:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-southeast-1  # đổi region nếu cần
+
+      - name: Update kubeconfig for EKS
+        run: |
+          aws eks update-kubeconfig --name my-eks-cluster --region ap-southeast-1
+
+      - name: Create monitoring namespace
+        run: |
+          kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Add Helm repo
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+
+      - name: Create additional scrape config file
+        run: |
+          cat <<EOF > prometheus-additional.yaml
+          - job_name: 'ec2'
+            metrics_path: /metrics
+            static_configs:
+              - targets:
+                  - 1.2.3.4:9100
+                  - 1.2.3.4:80
+          - job_name: blackbox
+            metrics_path: /probe
+            params:
+              module: [http_2xx]
+            static_configs:
+              - targets:
+                  - http://1.2.3.4
+            relabel_configs:
+            - source_labels: [__address__]
+              target_label: __param_target
+            - source_labels: [__param_target]
+              target_label: instance
+            - target_label: __address__
+              replacement: blackbox-exporter-prometheus-blackbox-exporter.monitoring:9115
+          EOF
+
+      - name: Create Kubernetes secret for scrape configs
+        run: |
+          kubectl create secret generic additional-scrape-configs \
+            --from-file=prometheus-additional.yaml \
+            --namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Install Prometheus with Helm
+        run: |
+          helm install prometheus prometheus-community/kube-prometheus-stack \
+            -f monitoring-values.yaml \
+            --namespace monitoring
