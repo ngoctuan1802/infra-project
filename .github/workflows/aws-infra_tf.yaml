@@ -1,0 +1,33 @@
+name: Terraform Deploy
+
+on:
+  workflow_dispatch:  # chạy thủ công
+  workflow_call:      # cho phép gọi từ workflow khác
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform init
+        run: terraform -chdir=infra/terraform init
+
+      - name: Terraform apply
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: terraform -chdir=infra/terraform apply -auto-approve
+
+      - name: Save terraform outputs
+        run: |
+          terraform -chdir=infra/terraform output -json > tfoutputs.json
+
+      - name: Upload outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfoutputs
+          path: tfoutputs.json
