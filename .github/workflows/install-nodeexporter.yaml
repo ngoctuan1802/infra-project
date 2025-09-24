@@ -1,0 +1,62 @@
+name: Install Node Exporter on EC2
+
+on:
+  workflow_dispatch:
+
+jobs:
+  install-node-exporter:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lấy output từ workflow trước (EC2 IP)
+        uses: actions/download-artifact@v4
+        with:
+          name: ec2-ip
+          path: ./terraform-output
+
+      - name: Đọc EC2 IP
+        id: ec2
+        run: |
+          EC2_IP=$(cat ./terraform-output/public_ip.txt)
+          echo "ec2_ip=$EC2_IP" >> $GITHUB_OUTPUT
+
+      - name: SSH vào EC2 và cài đặt Node Exporter
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ steps.ec2.outputs.ec2_ip }}
+          username: ubuntu   # hoặc ec2-user tùy AMI
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Step 2: Install Node Exporter
+            sudo useradd --no-create-home --shell /bin/false node_exporter || true
+            wget https://github.com/prometheus/node_exporter/releases/download/v1.8.2/node_exporter-1.8.2.linux-amd64.tar.gz
+            tar xvfz node_exporter-1.8.2.linux-amd64.tar.gz
+            sudo cp node_exporter-1.8.2.linux-amd64/node_exporter /usr/local/bin/
+            sudo chown node_exporter:node_exporter /usr/local/bin/node_exporter
+
+            # Step 3: Configure systemd service
+            echo "[Unit]
+            Description=Node Exporter
+            Wants=network-online.target
+            After=network-online.target
+
+            [Service]
+            User=node_exporter
+            Group=node_exporter
+            Type=simple
+            ExecStart=/usr/local/bin/node_exporter
+
+            [Install]
+            WantedBy=multi-user.target" | sudo tee /etc/systemd/system/node_exporter.service
+
+            sudo systemctl daemon-reload
+            sudo systemctl enable node_exporter
+            sudo systemctl start node_exporter
+
+            # Step 4: Open port 9100
+            if command -v ufw >/dev/null 2>&1; then
+              sudo ufw allow 9100/tcp
+              sudo systemctl restart ufw
+            fi
+
+            # Step 5: Check status
+            sudo systemctl status node_exporter --no-pager
