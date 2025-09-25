@@ -7,19 +7,19 @@ jobs:
   install-node-exporter:
     runs-on: ubuntu-latest
     steps:
-      - name: Lấy output từ workflow trước (EC2 IP)
+      - name: GetEC2 IP from artifact
         uses: actions/download-artifact@v4
         with:
           name: ec2-ip
           path: ./terraform-output
-
-      - name: Đọc EC2 IP
+  
+      - name: Read EC2 IP
         id: ec2
         run: |
           EC2_IP=$(cat ./terraform-output/public_ip.txt)
           echo "ec2_ip=$EC2_IP" >> $GITHUB_OUTPUT
 
-      - name: SSH vào EC2 và cài đặt Node Exporter
+      - name: SSH and install node exporte
         uses: appleboy/ssh-action@v0.1.10
         with:
           host: ${{ steps.ec2.outputs.ec2_ip }}
