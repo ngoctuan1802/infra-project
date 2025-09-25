@@ -1,0 +1,16 @@
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# AWS credentials scripts
+set-aws-creds*.ps1
+secrets/
+
+# OS / Editor files
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+TODO.md

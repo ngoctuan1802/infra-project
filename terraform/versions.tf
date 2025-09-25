@@ -1,6 +1,6 @@
 # Control version of Terraform and Providers (AWS, K8s)
 terraform {
-  required_version = ">= 1.13.3"
+  required_version = ">= 1.5.0, < 2.0.0"
   required_providers {
     aws = {
       source  = "hashicorp/aws"

@@ -25,12 +25,12 @@ locals {
 #### VPC
 
 module "vpc" {
-  source     = "./modules/vpc"
-  cidr_block = "10.100.0.0/16"
-
-  account_owner = local.name
-  name          = "${local.name}-project"
-  azs           = ["us-east-2a", "us-east-2b", "us-east-2c"]
+  source               = "../../modules/vpc"
+  cidr_block           = "10.100.0.0/16"
+  name                 = "${local.name}-project"
+  azs                  = ["us-east-2a", "us-east-2b", "us-east-2c"]
+  private_subnet_cidrs = ["10.100.1.0/24", "10.100.2.0/24", "10.100.3.0/24"]
+  public_subnet_cidrs  = ["10.100.101.0/24", "10.100.102.0/24", "10.100.103.0/24"]
   private_subnet_tags = {
     "kubernetes.io/role/internal-elb" = 1
   }
@@ -42,11 +42,11 @@ module "vpc" {
 ### EC2 WEB SERVER
 
 module "project_ec2" {
-  source             = "./modules/ec2"
+  source             = "../../modules/ec2"
   name               = local.name
   account            = data.aws_caller_identity.current.account_id
-  aws_ami            = "ami-01040813c3969933e"
-  private_subnet_ids = module.vpc.private_subnet_ids
+  aws_ami            = "ami-03f0e0a27c8814eaf"
+  private_subnet_ids = module.vpc.private_subnets
   vpc_id             = module.vpc.vpc_id
 }
 
@@ -68,9 +68,9 @@ data "aws_eks_cluster_auth" "cluster" {
 }
 
 module "project_eks" {
-  source             = "./modules/eks"
+  source             = "../../modules/eks"
   name               = local.name
   account            = data.aws_caller_identity.current.account_id
-  private_subnet_ids = module.vpc.private_subnet_ids
+  private_subnet_ids = module.vpc.private_subnets
   vpc_id             = module.vpc.vpc_id
 }
