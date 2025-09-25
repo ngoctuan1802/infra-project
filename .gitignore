@@ -1,16 +1,59 @@
+# IDE / Editor
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*~
+*.swp
+*.swo
+
+# OS Generated Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
 # Terraform
+# State and plans should not be committed
 *.tfstate
-*.tfstate.*
+*.tfstate.backup
+*.tfplan
+
+# Lock file and local modules/plugins
 .terraform/
 .terraform.lock.hcl
 
-# AWS credentials scripts
-set-aws-creds*.ps1
-secrets/
+# Sensitive variables files
+*.tfvars
+*.tfvars.json
 
-# OS / Editor files
+# Local overrides
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Crash logs
+crash.log
+crash.*.log
+
+# Secrets & Credentials
+# Do not commit secrets, keys, or credentials
+secrets/
+*.pem
+*.key
+*.cer
+.env
+set-aws-creds*.ps1
+
+# Logs
 *.log
-.DS_Store
-Thumbs.db
-.vscode/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Miscellaneous
 TODO.md
