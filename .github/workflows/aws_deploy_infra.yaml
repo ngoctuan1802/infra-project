@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: terraform/${{ github.event.inputs.environment }}
+        working-directory: terraform/enviroments/${{ github.event.inputs.environment }}
 
     permissions:
       id-token: write   # BẮT BUỘC để dùng OIDC
