@@ -6,16 +6,21 @@ on:
 jobs:
   install-node-exporter:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # cần cho OIDC
+      contents: read
+
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials (OIDC)
+      - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::491085416582:role/GitHubActions-Role
+          role-to-assume: arn:aws:iam::491085416582:role/GitHubActions-Role # get on AWS IAM console
           aws-region: us-east-2
+
 
       - name: Download Terraform state
         run: |
