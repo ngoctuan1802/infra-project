@@ -32,6 +32,7 @@ jobs:
           IP=$(jq -r '.resources[] | select(.type=="aws_instance") | .instances[0].attributes.public_ip' terraform.tfstate)
           echo "EC2_IP=$IP" >> $GITHUB_ENV
 
+
       - name: Install Node Exporter via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -65,3 +66,12 @@ jobs:
             sudo systemctl daemon-reload
             sudo systemctl enable --now node_exporter
             sudo systemctl start node_exporter
+      - name: Output Node Exporter Status
+        run: |
+          ssh -o StrictHostKeyChecking=no -i <(echo "${{ secrets.EC2_SSH_KEY }}") ubuntu@${{ env.EC2_IP }} "systemctl status node_exporter
+      - name: Verify Node Exporter
+        run: |
+          curl http://${{ env.EC2_IP }}:9100/metrics | head -n 10
+          
+      - name: Output Node Exporter URL
+        run: echo "Node Exporter URL: http://${{ env.EC2_IP }}:9100/metrics"
