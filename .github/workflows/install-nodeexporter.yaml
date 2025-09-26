@@ -73,5 +73,5 @@ jobs:
         run: |
           curl http://${{ env.EC2_IP }}:9100/metrics | head -n 10
 
-      - name: Output Node Exporter URL
-        run: echo "Node Exporter URL: http://${{ env.EC2_IP }}:9100/metrics"
+#      - name: Output Node Exporter URL
+#        run: echo "Node Exporter URL: http://${{ env.EC2_IP }}:9100/metrics"
