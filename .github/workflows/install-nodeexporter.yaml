@@ -1,4 +1,4 @@
-name: Install Node Exporter on EC2
+name: Install Node Exporter
 
 on:
   workflow_dispatch:
@@ -6,35 +6,43 @@ on:
 jobs:
   install-node-exporter:
     runs-on: ubuntu-latest
-    steps:
-      - name: GetEC2 IP from artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ec2-ip
-          path: ./terraform-output
-  
-      - name: Read EC2 IP
-        id: ec2
-        run: |
-          EC2_IP=$(cat ./terraform-output/public_ip.txt)
-          echo "ec2_ip=$EC2_IP" >> $GITHUB_OUTPUT
 
-      - name: SSH and install node exporte
-        uses: appleboy/ssh-action@v0.1.10
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          host: ${{ steps.ec2.outputs.ec2_ip }}
-          username: ubuntu   # hoặc ec2-user tùy AMI
-          key: ${{ secrets.EC2_SSH_KEY }}
+          role-to-assume: arn:aws:iam::491085416582:role/GitHubActions-Role
+          aws-region: us-east-2
+
+      - name: Download Terraform state
+        run: |
+          aws s3 cp s3://terraform-state-justin-udacity/terraform/terraform.tfstate terraform.tfstate
+
+      - name: Get EC2 Public IP
+        id: getip
+        run: |
+          IP=$(jq -r '.resources[] | select(.type=="aws_instance") | .instances[0].attributes.public_ip' terraform.tfstate)
+          echo "EC2_IP=$IP" >> $GITHUB_ENV
+
+      - name: Install Node Exporter via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ env.EC2_IP }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }} # hoặc password nếu bạn chọn
           script: |
-            # Step 2: Install Node Exporter
-            sudo useradd --no-create-home --shell /bin/false node_exporter || true
             wget https://github.com/prometheus/node_exporter/releases/download/v1.8.2/node_exporter-1.8.2.linux-amd64.tar.gz
-            tar xvfz node_exporter-1.8.2.linux-amd64.tar.gz
-            sudo cp node_exporter-1.8.2.linux-amd64/node_exporter /usr/local/bin/
+            tar xvf node_exporter-1.8.2.linux-amd64.tar.gz
+            sudo mv node_exporter-1.8.2.linux-amd64/node_exporter /usr/local/bin/
+
+            sudo useradd --no-create-home --shell /bin/false node_exporter || true
             sudo chown node_exporter:node_exporter /usr/local/bin/node_exporter
 
-            # Step 3: Configure systemd service
-            echo "[Unit]
+            sudo tee /etc/systemd/system/node_exporter.service <<EOF
+            [Unit]
             Description=Node Exporter
             Wants=network-online.target
             After=network-online.target
@@ -46,17 +54,9 @@ jobs:
             ExecStart=/usr/local/bin/node_exporter
 
             [Install]
-            WantedBy=multi-user.target" | sudo tee /etc/systemd/system/node_exporter.service
+            WantedBy=multi-user.target
+            EOF
 
             sudo systemctl daemon-reload
-            sudo systemctl enable node_exporter
+            sudo systemctl enable --now node_exporter
             sudo systemctl start node_exporter
-
-            # Step 4: Open port 9100
-            if command -v ufw >/dev/null 2>&1; then
-              sudo ufw allow 9100/tcp
-              sudo systemctl restart ufw
-            fi
-
-            # Step 5: Check status
-            sudo systemctl status node_exporter --no-pager
