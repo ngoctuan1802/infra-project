@@ -23,18 +23,18 @@ jobs:
       - name: Verify identity
         run: aws sts get-caller-identity
 
-  slack-notify:
+slack-notify:
     name: Notify Slack
-    needs: aws-test
+    needs: <job-name>
     if: always()
     uses: ./.github/workflows/slack-notify.yml
     with:
-      status: ${{ needs.aws-test.result }}
-      stage: "Test AWS OIDC"
-      environment: "test"
+      status: ${{ needs.terraform.result }}
+      stage: "Terraform Plan"
+      environment: "staging"
       repository: ${{ github.repository }}
       actor: ${{ github.actor }}
       run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       summary_file: terraform.log
     secrets:
-      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}  
