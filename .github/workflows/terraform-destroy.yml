@@ -3,13 +3,18 @@ name: Terraform Destroy (OIDC)
 on:
   workflow_dispatch:
     inputs:
-      confirm:
-        description: "Type 'YES' to confirm destroy"
+      environment:
+        description: "Which environment to DESTROY (dev or prod)"
         required: true
+        default: "dev"
 
 jobs:
-  destroy:
+  terraform:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform/enviroments/${{ github.event.inputs.environment }}
+
     permissions:
       id-token: write   # cần cho OIDC
       contents: read
