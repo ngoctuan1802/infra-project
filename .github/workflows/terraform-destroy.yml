@@ -10,6 +10,9 @@ on:
 jobs:
   destroy:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # cần cho OIDC
+      contents: read
 
     steps:
       - name: Checkout repository
