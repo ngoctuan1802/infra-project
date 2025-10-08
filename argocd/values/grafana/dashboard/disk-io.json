@@ -1,0 +1,30 @@
+{
+  "uid": "disk-io",
+  "title": "Disk I/O Dashboard",
+  "schemaVersion": 36,
+  "version": 1,
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Disk I/O Now",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "node_disk_io_now",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "iops",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green"}, {"value": 1000, "color": "red"}]}
+        }
+      },
+      "options": {
+        "legend": {"displayMode": "list"},
+        "tooltip": {"mode": "single"}
+      }
+    }
+  ]
+}

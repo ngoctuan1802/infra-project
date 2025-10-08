@@ -1,0 +1,53 @@
+# values.yaml cho ArgoCD Helm chart trên EKS
+# Dựa trên default từ https://github.com/argoproj/argo-helm/tree/main/charts/argo-cd
+
+global:
+  domain: ""  # Không dùng nếu không có custom domain
+  image:
+    repository: quay.io/argoproj/argocd
+    # tag: v2.12.4  # Giữ default, Helm sẽ dùng latest compatible
+    pullPolicy: IfNotPresent
+  # EKS-specific: Không cần thay đổi, nhưng đảm bảo ECR pull nếu dùng custom image
+
+server:
+  insecure: true  # Bật để truy cập http://localhost:8080 mà không cần cert (dev/test)
+  replicas: 1  # Scale lên 3+ cho prod
+  autoscaling:
+    enabled: false  # Tắt HPA nếu không cần
+  service:
+    type: ClusterIP  # Giữ ClusterIP; patch thành LoadBalancer sau nếu cần external access
+  extraArgs:
+    - --insecure  # Cho phép insecure mode
+
+configs:
+  secret:
+    argocdServerAdminPassword: ""  # Để Helm tạo random password (lấy sau qua kubectl)
+  params:
+    server.insecure: "true"  # Override config params cho insecure
+  cm:
+    # Custom config nếu cần (ví dụ: timeout, resource limits)
+    resource.customizations: |
+      # Default resource limits cho EKS
+      deployments.argoproj.io/ApplicationController:
+        resources:
+          limits:
+            cpu: 1
+            memory: 1Gi
+          requests:
+            cpu: 250m
+            memory: 256Mi
+
+# Tắt một số components không cần cho basic setup
+redis: {}  # Giữ default Redis
+repoServer:
+  resources: {}  # Default resources
+applicationController:
+  resources: {}  # Default
+
+# Monitoring (tùy chọn, bật nếu cần Prometheus)
+metrics:
+  enabled: false  # Tắt nếu chưa có Prometheus trên EKS
+
+# Ingress (nếu dùng ALB Ingress sau)
+ingress:
+  enabled: false  # Tắt; dùng AWS ALB nếu cần external

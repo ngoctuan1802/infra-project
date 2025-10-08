@@ -1,0 +1,13 @@
+grafana:
+  dashboards:
+    default:
+      cpu-usage:
+        file: dashboards/cpu-usage.json
+      memory:
+        file: dashboards/memory.json
+      disk-io:
+        file: dashboards/disk-io.json
+      network:
+        file: dashboards/network.json
+
+# helm upgrade --install prometheus prometheus-community/kube-prometheus-stack -f values.yaml --namespace monitoring

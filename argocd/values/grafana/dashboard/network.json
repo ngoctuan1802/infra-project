@@ -1,0 +1,30 @@
+{
+  "uid": "network",
+  "title": "Network Received Dashboard",
+  "schemaVersion": 36,
+  "version": 1,
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Network Received (bytes)",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "instance:node_network_receive_bytes:rate:sum",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green"}, {"value": 10000000, "color": "red"}]}
+        }
+      },
+      "options": {
+        "legend": {"displayMode": "list"},
+        "tooltip": {"mode": "single"}
+      }
+    }
+  ]
+}

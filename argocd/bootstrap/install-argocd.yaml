@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd
+---
+# Install ArgoCD core components
+# Manifest chính thức từ ArgoCD, bạn có thể copy hoặc apply từ URL:
+# kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+# Ở đây mình chỉ giữ lại link tham chiếu để bootstrap

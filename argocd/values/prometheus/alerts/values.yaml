@@ -1,0 +1,61 @@
+prometheus:
+  prometheusSpec:
+    additionalPrometheusRulesMap:
+      high-cpu-memory-disk-network-alerts:
+        groups:
+          - name: instance-resource-alerts
+            rules:
+              # 🔥 Alert 1: High CPU Usage
+              - alert: HighCPUUsage
+                expr: instance:node_cpu:rate:sum > 0.8
+                for: 2m
+                labels:
+                  severity: warning
+                annotations:
+                  summary: "High CPU usage detected"
+                  description: "Instance {{ $labels.instance }} CPU usage > 80% for more than 2 minutes"
+
+              # 💾 Alert 2: Low Memory Available
+              - alert: LowMemoryAvailable
+                expr: node_memory_MemAvailable_bytes < 100000000
+                for: 2m
+                labels:
+                  severity: warning
+                annotations:
+                  summary: "Low available memory"
+                  description: "Instance {{ $labels.instance }} has less than 100MB available memory"
+
+              # 🧱 Alert 3: High Disk I/O
+              - alert: HighDiskIO
+                expr: node_disk_io_now > 1000
+                for: 2m
+                labels:
+                  severity: critical
+                annotations:
+                  summary: "High Disk I/O activity"
+                  description: "Instance {{ $labels.instance }} has Disk I/O over 1000 operations"
+
+              # 🌐 Alert 4: High Network Receive
+              - alert: HighNetworkReceive
+                expr: instance:node_network_receive_bytes:rate:sum > 50000000
+                for: 2m
+                labels:
+                  severity: warning
+                annotations:
+                  summary: "High Network Receive Traffic"
+                  description: "Instance {{ $labels.instance }} receiving more than 50MB/s for 2 minutes"
+alertmanager:
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      receiver: 'team-webhook'
+      group_by: ['alertname', 'instance']
+      group_wait: 30s
+      group_interval: 2m
+      repeat_interval: 2h
+    receivers:
+      - name: 'team-webhook'
+        webhook_configs:
+          - url: 'https://webhook.team.company/alerts'
+            send_resolved: true

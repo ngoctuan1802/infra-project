@@ -1,0 +1,64 @@
+name: Deploy Monitoring Stack
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'blackbox/**'
+      - 'prometheus/**'
+      - 'grafana/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      KUBECONFIG: ${{ github.workspace }}/kubeconfig
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'latest'
+
+      - name: Create kubeconfig
+        run: |
+          echo "${{ secrets.KUBE_CONFIG }}" > $KUBECONFIG
+
+      - name: Add Helm repositories
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+
+      - name: Deploy Blackbox Secret
+        run: |
+          kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+          kubectl delete secret blackbox-api-token -n monitoring --ignore-not-found
+          kubectl create secret generic blackbox-api-token \
+            --from-literal=BEARER_TOKEN="${{ secrets.BEARER_TOKEN }}" \
+            -n monitoring
+
+      - name: Deploy Blackbox Exporter
+        run: |
+          helm upgrade --install blackbox-exporter prometheus-community/prometheus-blackbox-exporter \
+            -f blackbox/values.yaml \
+            --namespace monitoring \
+            --set bearer_token=${{ secrets.BEARER_TOKEN }}
+
+      - name: Deploy Prometheus
+        run: |
+          helm upgrade --install prometheus prometheus-community/kube-prometheus-stack \
+            -f prometheus/values.yaml \
+            -n monitoring
+
+      - name: Deploy Alert Rules
+        run: |
+          kubectl apply -f prometheus/alert-rules.yaml -n monitoring
+
+      - name: Upload Grafana dashboards
+        run: |
+          kubectl apply -f grafana/dashboards/ -n monitoring

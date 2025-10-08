@@ -1,0 +1,30 @@
+{
+  "uid": "memory",
+  "title": "Memory Dashboard",
+  "schemaVersion": 36,
+  "version": 1,
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Available Memory (bytes)",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "node_memory_MemAvailable_bytes",
+          "legendFormat": "{{instance}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green"}, {"value": 100000000, "color": "red"}]}
+        }
+      },
+      "options": {
+        "legend": {"displayMode": "table"},
+        "tooltip": {"mode": "single"}
+      }
+    }
+  ]
+}
