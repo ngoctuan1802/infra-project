@@ -1,5 +1,4 @@
-name: Terraform CI/CD (with environment & confirm)
-
+name: Terraform Actions
 on:
   workflow_dispatch:
     inputs:
@@ -33,59 +32,90 @@ jobs:
   terraform:
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment }}
-
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
+       
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.8.5
-
+       
       # ✅ OIDC authentication
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::491085416582:role/GitHubActions-Role
           aws-region: us-east-2
-          
-      # ✅ Load environment variables (optional per environment)
+                 
+      # ✅ Set working directory based on environment
       - name: Set environment variables
         run: |
-          echo "TF_ENV=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
-          echo "Environment selected: $TF_ENV"
-          # Optional: set backend config or var file based on env
-          if [ "$TF_ENV" = "prod" ]; then
-            echo "TF_VAR_backend_bucket=my-prod-tfstate" >> $GITHUB_ENV
-          elif [ "$TF_ENV" = "staging" ]; then
-            echo "TF_VAR_backend_bucket=my-staging-tfstate" >> $GITHUB_ENV
+          ENV="${{ github.event.inputs.environment }}"
+          echo "TF_ENV=${ENV}" >> $GITHUB_ENV
+          echo "TF_WORKING_DIR=terraform/environments/${ENV}" >> $GITHUB_ENV
+          echo "📁 Working directory: terraform/environments/${ENV}"
+          
+          # Set backend bucket per environment
+          if [ "$ENV" = "prod" ]; then
+            echo "TF_BACKEND_BUCKET=my-prod-tfstate" >> $GITHUB_ENV
+          elif [ "$ENV" = "staging" ]; then
+            echo "TF_BACKEND_BUCKET=my-staging-tfstate" >> $GITHUB_ENV
           else
-            echo "TF_VAR_backend_bucket=my-dev-tfstate" >> $GITHUB_ENV
+            echo "TF_BACKEND_BUCKET=my-dev-tfstate" >> $GITHUB_ENV
           fi
-
+       
       - name: Terraform Init
-        run: terraform init -backend-config="bucket=${TF_VAR_backend_bucket}"
-
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init -backend-config="bucket=${TF_BACKEND_BUCKET}"
+       
+      - name: Terraform Validate
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform validate
+       
       - name: Terraform Plan
-        run: terraform plan -no-color -out=tfplan -var "environment=${TF_ENV}"
-
-      - name: Save Terraform log
-        run: terraform show -no-color tfplan | tee terraform.log
-
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          if [ "${{ github.event.inputs.action }}" = "destroy" ]; then
+            terraform plan -destroy -no-color -out=tfplan
+          else
+            terraform plan -no-color -out=tfplan
+          fi
+       
+      - name: Save Terraform Plan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform show -no-color tfplan | tee terraform-plan.log
+       
+      - name: Upload Plan Artifact
+        if: github.event.inputs.action != 'plan'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ env.TF_ENV }}
+          path: ${{ env.TF_WORKING_DIR }}/tfplan
+          retention-days: 5
+       
       - name: Terraform Apply
         if: github.event.inputs.action == 'apply'
+        working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform apply -auto-approve tfplan
-
+       
       - name: Terraform Destroy
         if: github.event.inputs.action == 'destroy'
+        working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
           if [ "${{ github.event.inputs.confirm }}" != "YES" ]; then
             echo "❌ Destroy cancelled: please type 'YES' to confirm."
             exit 1
           fi
-          terraform plan -destroy -out=tfplan-destroy -var "environment=${TF_ENV}"
-          terraform apply -auto-approve tfplan-destroy
+          echo "⚠️  Destroying infrastructure in ${{ env.TF_ENV }} environment..."
+          terraform apply -auto-approve tfplan
+       
+      - name: Comment Plan Output (Optional)
+        if: github.event.inputs.action == 'plan'
+        run: |
+          echo "✅ Terraform plan completed for ${{ env.TF_ENV }} environment"
+          echo "Review the plan above before running apply"
           
   slack-notify:
     name: Notify Slack
