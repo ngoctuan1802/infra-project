@@ -1,3 +1,4 @@
+# Install with helm the EKS monitoring stack including Blackbox Exporter, Prometheus, and Grafana
 name: Deploy Monitoring Stack
 
 on:

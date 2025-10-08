@@ -1,4 +1,4 @@
-name: Test AWS OIDC
+name: 00. Test AWS OIDC
 
 on:
   workflow_dispatch:   # chạy thủ công từ GitHub UI
