@@ -76,60 +76,47 @@ jobs:
           esac
           
           # Đọc summary từ file (nếu có)
-          SUMMARY_JSON=""
           if [ -n "${{ inputs.summary_file }}" ] && [ -f "${{ inputs.summary_file }}" ]; then
             # Đọc 20 dòng cuối, escape JSON đúng cách
             SUMMARY_RAW=$(tail -n 20 "${{ inputs.summary_file }}" | head -c 2000)
-            # Dùng jq để escape an toàn
-            SUMMARY_JSON=$(printf '%s' "$SUMMARY_RAW" | jq -Rs .)
+            # Dùng jq để escape an toàn và wrap trong backticks
+            SUMMARY_TEXT=$(printf '```\n%s\n```' "$SUMMARY_RAW" | jq -Rs .)
           else
-            SUMMARY_JSON='"(No log summary available)"'
+            SUMMARY_TEXT=$(printf '```\n(No log summary available)\n```' | jq -Rs .)
           fi
           
           # Build JSON payload với jq để đảm bảo valid JSON
-          cat <<EOF | jq . > slack_payload.json
-          {
-            "text": "${ICON} *${{ inputs.stage }}* on *${{ inputs.environment }}* — *${TEXT_STATUS}*",
-            "attachments": [
-              {
-                "color": "${COLOR}",
-                "fields": [
-                  {
-                    "title": "Repository",
-                    "value": "${{ inputs.repository }}",
-                    "short": true
-                  },
-                  {
-                    "title": "Triggered by",
-                    "value": "${{ inputs.actor }}",
-                    "short": true
-                  },
-                  {
-                    "title": "Environment",
-                    "value": "${{ inputs.environment }}",
-                    "short": true
-                  },
-                  {
-                    "title": "Status",
-                    "value": "${TEXT_STATUS}",
-                    "short": true
-                  },
-                  {
-                    "title": "Workflow Run",
-                    "value": "<${{ inputs.run_url }}|View Details>",
-                    "short": false
-                  }
-                ]
-              },
-              {
-                "color": "#36a64f",
-                "title": "Last 20 lines of log:",
-                "text": "\\`\\`\\`" + ${SUMMARY_JSON} + "\\`\\`\\`",
-                "mrkdwn_in": ["text"]
-              }
-            ]
-          }
-          EOF
+          jq -n \
+            --arg icon "$ICON" \
+            --arg stage "${{ inputs.stage }}" \
+            --arg env "${{ inputs.environment }}" \
+            --arg text_status "$TEXT_STATUS" \
+            --arg color "$COLOR" \
+            --arg repo "${{ inputs.repository }}" \
+            --arg actor "${{ inputs.actor }}" \
+            --arg run_url "${{ inputs.run_url }}" \
+            --argjson summary "$SUMMARY_TEXT" \
+            '{
+              text: "\($icon) *\($stage)* on *\($env)* — *\($text_status)*",
+              attachments: [
+                {
+                  color: $color,
+                  fields: [
+                    {title: "Repository", value: $repo, short: true},
+                    {title: "Triggered by", value: $actor, short: true},
+                    {title: "Environment", value: $env, short: true},
+                    {title: "Status", value: $text_status, short: true},
+                    {title: "Workflow Run", value: "<\($run_url)|View Details>", short: false}
+                  ]
+                },
+                {
+                  color: "#36a64f",
+                  title: "Last 20 lines of log:",
+                  text: $summary,
+                  mrkdwn_in: ["text"]
+                }
+              ]
+            }' > slack_payload.json
           
           echo "Generated Slack payload:"
           cat slack_payload.json
