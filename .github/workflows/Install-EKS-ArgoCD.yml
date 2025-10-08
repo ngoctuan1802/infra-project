@@ -1,8 +1,6 @@
 name: Deploy ArgoCD to EKS via Helm
 
 on:
-  push:
-    branches: [ "main" ]
   workflow_dispatch:  # Cho phép trigger manual từ UI
 
 permissions:

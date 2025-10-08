@@ -17,7 +17,7 @@ jobs:
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::491085416582:role/GitHubActions-Role # get on AWS IAM console
+          role-to-assume: arn:aws:iam::491085416582:role/GitHubActions-Role
           aws-region: us-east-2
 
       - name: Verify identity
@@ -25,16 +25,16 @@ jobs:
 
   slack-notify:
     name: Notify Slack
-    needs: terraform
+    needs: aws-test
     if: always()
     uses: ./.github/workflows/slack-notify.yml
     with:
-      status: ${{ needs.terraform.result }}
-      stage: "Terraform ${{ github.event.inputs.action }}"
-      environment: ${{ github.event.inputs.environment }}
+      status: ${{ needs.aws-test.result }}
+      stage: "Test AWS OIDC"
+      environment: "test"
       repository: ${{ github.repository }}
       actor: ${{ github.actor }}
       run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      summary_file: terraform.log    # ✅ tùy chọn: trỏ tới file plan hoặc error log
+      summary_file: terraform.log
     secrets:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
