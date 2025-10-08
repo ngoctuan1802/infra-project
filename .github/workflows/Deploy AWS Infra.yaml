@@ -10,7 +10,7 @@ on:
 
 
 jobs:
-  terraform:
+  deploy infrastructure:
     runs-on: ubuntu-latest
     defaults:
       run:

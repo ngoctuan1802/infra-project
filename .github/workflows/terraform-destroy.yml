@@ -9,7 +9,7 @@ on:
         default: "dev"
 
 jobs:
-  terraform:
+  destroy-infrastructure:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -34,13 +34,6 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::491085416582:role/GitHubActions-Role
           aws-region: us-east-2
-
-      # ✅ Optional: require manual confirmation
-      - name: Confirm destroy
-        if: ${{ github.event.inputs.confirm != 'YES' }}
-        run: |
-          echo "❌ Destroy cancelled: please type 'YES' to confirm."
-          exit 1
 
       - name: Terraform Init
         run: terraform init
