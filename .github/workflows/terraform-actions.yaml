@@ -44,12 +44,12 @@ jobs:
           terraform_version: 1.8.5
 
       # ✅ OIDC authentication
-      - name: Configure AWS credentials (OIDC)
+      - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::491085416582:role/GitHubActions-Role
           aws-region: us-east-2
-
+          
       # ✅ Load environment variables (optional per environment)
       - name: Set environment variables
         run: |
