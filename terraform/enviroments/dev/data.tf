@@ -15,11 +15,3 @@ data "aws_ami" "amazon_linux_2" {
     values = ["amzn2-ami-hvm*"]
   }
 }
-
-data "aws_eks_cluster" "cluster" {
-  name = module.project_eks.cluster_name
-}
-
-data "aws_eks_cluster_auth" "cluster" {
-  name = module.project_eks.cluster_name
-}
