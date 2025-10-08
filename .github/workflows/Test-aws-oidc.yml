@@ -4,7 +4,7 @@ on:
   workflow_dispatch:   # chạy thủ công từ GitHub UI
 
 jobs:
-  aws-test:
+  oidc-test:
     runs-on: ubuntu-latest
     permissions:
       id-token: write   # cần cho OIDC
@@ -25,7 +25,7 @@ jobs:
 
 slack-notify:
     name: Notify Slack
-    needs: <job-name>
+    needs: oidc-test
     if: always()
     uses: ./.github/workflows/slack-notify.yml
     with:
