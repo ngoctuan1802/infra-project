@@ -122,7 +122,7 @@ jobs:
           cat slack_payload.json
 
       - name: Send Slack notification
-        uses: slackapi/slack-github-action@v2.0.0
+        uses: slackapi/slack-github-action@v1.27.0
         with:
           payload-file-path: slack_payload.json
         env:
