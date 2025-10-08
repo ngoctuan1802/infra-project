@@ -93,13 +93,13 @@ jobs:
     if: always()
     uses: ./.github/workflows/slack-notify.yml
     with:
-      status: ${{ needs.terraform.result }}
-      stage: "Terraform ${{ github.event.inputs.action }}"
-      environment: ${{ github.event.inputs.environment }}
+      status: ${{ needs.terraform.result }}  # ✅ Sửa lại đúng job name
+      stage: "AWS OIDC Test"
+      environment: "staging"
       repository: ${{ github.repository }}
       actor: ${{ github.actor }}
       run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      summary_file: terraform.log    # ✅ tùy chọn: trỏ tới file plan hoặc error log
+      summary_file: aws-identity.log  # File này sẽ được download từ artifact
     secrets:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
