@@ -12,7 +12,7 @@ on:
           - apply
           - destroy
       environment:
-        description: "Select environment to deploy"
+        description: "Select environment to deploy (dev or prod)"
         required: true
         default: "dev"
         type: choice
@@ -70,14 +70,12 @@ jobs:
     if: always()
     uses: ./.github/workflows/slack-notify.yml
     with:
-      status: ${{ needs.terraform.result }}  # ✅ Sửa lại đúng job name
+      status: ${{ needs.terraform.result }}
       stage: "AWS OIDC Test"
-      environment: "staging"
+      environment: ${{ github.event.inputs.environment }}
       repository: ${{ github.repository }}
       actor: ${{ github.actor }}
       run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      summary_file: aws-identity.log  # File này sẽ được download từ artifact
+      summary_file: aws-identity.log
     secrets:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-

@@ -3,7 +3,7 @@ name: 01. Terraform Deploy
 on:
   workflow_dispatch:
     inputs:
-      environment:
+      enviroment:
         description: "Which environment to deploy (dev or prod)"
         required: true
         default: "dev"
