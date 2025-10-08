@@ -1,7 +1,7 @@
 name: Slack Notification
 
 on:
-  workflow_call:
+    workflow_call:
     inputs:
       status:
         required: true

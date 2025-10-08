@@ -23,7 +23,7 @@ jobs:
       - name: Verify identity
         run: aws sts get-caller-identity
 
-slack-notify:
+  slack-notify:
     name: Notify Slack
     needs: oidc-test
     if: always()
