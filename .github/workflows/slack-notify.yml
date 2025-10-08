@@ -1,17 +1,20 @@
 name: Slack Notification
 
 on:
-    workflow_call:
+  workflow_call:
     inputs:
       status:
         required: true
         type: string
+        description: 'Job status (success/failure/cancelled)'
       stage:
         required: true
         type: string
+        description: 'Stage name (e.g., Terraform Plan)'
       environment:
         required: true
         type: string
+        description: 'Environment (e.g., staging, production)'
       repository:
         required: true
         type: string
@@ -24,6 +27,8 @@ on:
       summary_file:
         required: false
         type: string
+        default: ''
+        description: 'Path to log file to include in notification'
     secrets:
       SLACK_WEBHOOK_URL:
         required: true
@@ -32,55 +37,105 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
+      - name: Download artifacts (if summary file specified)
+        if: inputs.summary_file != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: logs
+          path: ./logs
+        continue-on-error: true
+
       - name: Build Slack message payload
         id: build_payload
+        shell: bash
         run: |
           STATUS="${{ inputs.status }}"
-          ICON=":white_check_mark:"
-          COLOR="good"
-          TEXT_STATUS="Success"
-
-          if [ "$STATUS" != "success" ]; then
-            ICON=":x:"
-            COLOR="danger"
-            TEXT_STATUS="Failed"
-          fi
-
-          # Đọc 20 dòng cuối từ summary file (nếu có)
-          SUMMARY=""
+          
+          # Xác định icon và color dựa trên status
+          case "$STATUS" in
+            success)
+              ICON=":white_check_mark:"
+              COLOR="good"
+              TEXT_STATUS="Success"
+              ;;
+            failure)
+              ICON=":x:"
+              COLOR="danger"
+              TEXT_STATUS="Failed"
+              ;;
+            cancelled)
+              ICON=":warning:"
+              COLOR="warning"
+              TEXT_STATUS="Cancelled"
+              ;;
+            *)
+              ICON=":grey_question:"
+              COLOR="#808080"
+              TEXT_STATUS="Unknown"
+              ;;
+          esac
+          
+          # Đọc summary từ file (nếu có)
+          SUMMARY_JSON=""
           if [ -n "${{ inputs.summary_file }}" ] && [ -f "${{ inputs.summary_file }}" ]; then
-            SUMMARY=$(tail -n 20 "${{ inputs.summary_file }}" | sed 's/"/\\"/g')
+            # Đọc 20 dòng cuối, escape JSON đúng cách
+            SUMMARY_RAW=$(tail -n 20 "${{ inputs.summary_file }}" | head -c 2000)
+            # Dùng jq để escape an toàn
+            SUMMARY_JSON=$(printf '%s' "$SUMMARY_RAW" | jq -Rs .)
           else
-            SUMMARY="(no summary found)"
+            SUMMARY_JSON='"(No log summary available)"'
           fi
-
-          cat <<EOF > slack_payload.json
+          
+          # Build JSON payload với jq để đảm bảo valid JSON
+          cat <<EOF | jq . > slack_payload.json
           {
             "text": "${ICON} *${{ inputs.stage }}* on *${{ inputs.environment }}* — *${TEXT_STATUS}*",
             "attachments": [
               {
                 "color": "${COLOR}",
                 "fields": [
-                  { "title": "Repository", "value": "${{ inputs.repository }}", "short": true },
-                  { "title": "Triggered by", "value": "${{ inputs.actor }}", "short": true },
-                  { "title": "Environment", "value": "${{ inputs.environment }}", "short": true },
-                  { "title": "Status", "value": "${TEXT_STATUS}", "short": true },
-                  { "title": "Logs", "value": "<${{ inputs.run_url }}|View Run Details>", "short": false }
+                  {
+                    "title": "Repository",
+                    "value": "${{ inputs.repository }}",
+                    "short": true
+                  },
+                  {
+                    "title": "Triggered by",
+                    "value": "${{ inputs.actor }}",
+                    "short": true
+                  },
+                  {
+                    "title": "Environment",
+                    "value": "${{ inputs.environment }}",
+                    "short": true
+                  },
+                  {
+                    "title": "Status",
+                    "value": "${TEXT_STATUS}",
+                    "short": true
+                  },
+                  {
+                    "title": "Workflow Run",
+                    "value": "<${{ inputs.run_url }}|View Details>",
+                    "short": false
+                  }
                 ]
               },
               {
-                "color": "#AAAAAA",
-                "text": "*Last 20 lines of log:*\n\`\`\`${SUMMARY}\`\`\`"
+                "color": "#36a64f",
+                "title": "Last 20 lines of log:",
+                "text": "\\`\\`\\`" + ${SUMMARY_JSON} + "\\`\\`\\`",
+                "mrkdwn_in": ["text"]
               }
             ]
           }
           EOF
-
-          echo "Payload built:"
+          
+          echo "Generated Slack payload:"
           cat slack_payload.json
 
       - name: Send Slack notification
-        uses: slackapi/slack-github-action@v1.25.0
+        uses: slackapi/slack-github-action@v2.0.0
         with:
           payload-file-path: slack_payload.json
         env:

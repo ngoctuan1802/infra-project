@@ -1,13 +1,13 @@
 name: 00. Test AWS OIDC
 
 on:
-  workflow_dispatch:   # chạy thủ công từ GitHub UI
+  workflow_dispatch:
 
 jobs:
   oidc-test:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write   # cần cho OIDC
+      id-token: write
       contents: read
 
     steps:
@@ -21,7 +21,22 @@ jobs:
           aws-region: us-east-2
 
       - name: Verify identity
-        run: aws sts get-caller-identity
+        id: verify
+        run: |
+          echo "Testing AWS OIDC authentication..."
+          aws sts get-caller-identity | tee aws-identity.log
+          
+          echo "Listing S3 buckets..."
+          aws s3 ls | tee -a aws-identity.log || echo "Failed to list S3 buckets" | tee -a aws-identity.log
+
+      # Upload logs làm artifact để slack-notify có thể đọc
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs
+          path: aws-identity.log
+          retention-days: 1
 
   slack-notify:
     name: Notify Slack
@@ -29,12 +44,12 @@ jobs:
     if: always()
     uses: ./.github/workflows/slack-notify.yml
     with:
-      status: ${{ needs.terraform.result }}
-      stage: "Terraform Plan"
+      status: ${{ needs.oidc-test.result }}  # ✅ Sửa lại đúng job name
+      stage: "AWS OIDC Test"
       environment: "staging"
       repository: ${{ github.repository }}
       actor: ${{ github.actor }}
       run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      summary_file: terraform.log
+      summary_file: aws-identity.log  # File này sẽ được download từ artifact
     secrets:
-      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}  
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
