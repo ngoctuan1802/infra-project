@@ -1,0 +1,106 @@
+name: Terraform CI/CD (with environment & confirm)
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Select Terraform action"
+        required: true
+        default: "plan"
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+      environment:
+        description: "Select environment to deploy"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      confirm:
+        description: "Type 'YES' to confirm destroy"
+        required: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.5
+
+      # ✅ OIDC authentication
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::491085416582:role/GitHubActions-Role
+          aws-region: us-east-2
+
+      # ✅ Load environment variables (optional per environment)
+      - name: Set environment variables
+        run: |
+          echo "TF_ENV=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
+          echo "Environment selected: $TF_ENV"
+          # Optional: set backend config or var file based on env
+          if [ "$TF_ENV" = "prod" ]; then
+            echo "TF_VAR_backend_bucket=my-prod-tfstate" >> $GITHUB_ENV
+          elif [ "$TF_ENV" = "staging" ]; then
+            echo "TF_VAR_backend_bucket=my-staging-tfstate" >> $GITHUB_ENV
+          else
+            echo "TF_VAR_backend_bucket=my-dev-tfstate" >> $GITHUB_ENV
+          fi
+
+      - name: Terraform Init
+        run: terraform init -backend-config="bucket=${TF_VAR_backend_bucket}"
+
+      - name: Terraform Plan
+        run: terraform plan -no-color -out=tfplan -var "environment=${TF_ENV}"
+
+      - name: Save Terraform log
+        run: terraform show -no-color tfplan | tee terraform.log
+
+      - name: Terraform Apply
+        if: github.event.inputs.action == 'apply'
+        run: terraform apply -auto-approve tfplan
+
+      - name: Terraform Destroy
+        if: github.event.inputs.action == 'destroy'
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "YES" ]; then
+            echo "❌ Destroy cancelled: please type 'YES' to confirm."
+            exit 1
+          fi
+          terraform plan -destroy -out=tfplan-destroy -var "environment=${TF_ENV}"
+          terraform apply -auto-approve tfplan-destroy
+          
+  slack-notify:
+    name: Notify Slack
+    needs: terraform
+    if: always()
+    uses: ./.github/workflows/slack-notify.yml
+    with:
+      status: ${{ needs.terraform.result }}
+      stage: "Terraform ${{ github.event.inputs.action }}"
+      environment: ${{ github.event.inputs.environment }}
+      repository: ${{ github.repository }}
+      actor: ${{ github.actor }}
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      summary_file: terraform.log    # ✅ tùy chọn: trỏ tới file plan hoặc error log
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+

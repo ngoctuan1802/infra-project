@@ -22,3 +22,19 @@ jobs:
 
       - name: Verify identity
         run: aws sts get-caller-identity
+
+  slack-notify:
+    name: Notify Slack
+    needs: terraform
+    if: always()
+    uses: ./.github/workflows/slack-notify.yml
+    with:
+      status: ${{ needs.terraform.result }}
+      stage: "Terraform ${{ github.event.inputs.action }}"
+      environment: ${{ github.event.inputs.environment }}
+      repository: ${{ github.repository }}
+      actor: ${{ github.actor }}
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      summary_file: terraform.log    # ✅ tùy chọn: trỏ tới file plan hoặc error log
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

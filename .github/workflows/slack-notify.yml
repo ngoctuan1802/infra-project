@@ -1,0 +1,91 @@
+name: Slack Notify
+
+on:
+  workflow_call:
+    inputs:
+      status:
+        description: "Result status (success, failure, cancelled)"
+        required: true
+        type: string
+      stage:
+        description: "Pipeline stage or action name"
+        required: true
+        type: string
+      environment:
+        description: "Deployment environment"
+        required: false
+        type: string
+        default: "N/A"
+      repository:
+        description: "Repository name"
+        required: true
+        type: string
+      actor:
+        description: "Who triggered the workflow"
+        required: true
+        type: string
+      run_url:
+        description: "URL to GitHub Actions run"
+        required: true
+        type: string
+      summary_file:
+        description: "Path to summary or log file (optional)"
+        required: false
+        type: string
+    secrets:
+      SLACK_WEBHOOK_URL:
+        required: true
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Load summary content (optional)
+        id: summary
+        if: ${{ inputs.summary_file != '' }}
+        run: |
+          if [ -f "${{ inputs.summary_file }}" ]; then
+            content=$(head -c 300 "${{ inputs.summary_file }}" | jq -Rs .)
+            echo "summary=$content" >> $GITHUB_OUTPUT
+          else
+            echo "summary=\"(no summary found)\"" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set message color & icon
+        id: fmt
+        run: |
+          if [ "${{ inputs.status }}" == "success" ]; then
+            echo "color=good" >> $GITHUB_OUTPUT
+            echo "icon=:white_check_mark:" >> $GITHUB_OUTPUT
+          elif [ "${{ inputs.status }}" == "failure" ]; then
+            echo "color=danger" >> $GITHUB_OUTPUT
+            echo "icon=:x:" >> $GITHUB_OUTPUT
+          else
+            echo "color=warning" >> $GITHUB_OUTPUT
+            echo "icon=:warning:" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Slack notification
+        uses: slackapi/slack-github-action@v1.25.0
+        with:
+          payload: |
+            {
+              "text": "${{ steps.fmt.outputs.icon }} *${{ inputs.stage }}* on *${{ inputs.environment }}* — *${{ inputs.status }}*",
+              "attachments": [
+                {
+                  "color": "${{ steps.fmt.outputs.color }}",
+                  "fields": [
+                    { "title": "Repository", "value": "${{ inputs.repository }}", "short": true },
+                    { "title": "Triggered by", "value": "${{ inputs.actor }}", "short": true },
+                    { "title": "Environment", "value": "${{ inputs.environment }}", "short": true },
+                    { "title": "Status", "value": "${{ inputs.status }}", "short": true },
+                    { "title": "Logs", "value": "<${{ inputs.run_url }}|View Run Details>", "short": false }
+                  ]
+                }
+                ${
+                  { "text": ${{ steps.summary.outputs.summary || '"(No summary provided)"' }} }
+                ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
