@@ -14,7 +14,7 @@ on:
       environment:
         required: true
         type: string
-        description: 'Environment (e.g., staging, production)'
+        description: 'Environment (e.g., dev/staging/prod)'
       repository:
         required: true
         type: string
@@ -29,10 +29,12 @@ on:
         type: string
         default: ''
         description: 'Path to log file to include in notification'
+      channel_id:
+        required: true
+        type: string
+        description: 'Slack Channel ID to send message'
     secrets:
       SLACK_BOT_TOKEN:
-        required: true
-      SLACK_CHANNEL_ID:
         required: true
 
 jobs:
@@ -53,7 +55,7 @@ jobs:
         run: |
           STATUS="${{ inputs.status }}"
 
-          # Xác định icon và màu theo trạng thái
+          # Emoji và màu theo trạng thái
           case "$STATUS" in
             success)
               ICON=":white_check_mark:"
@@ -77,14 +79,14 @@ jobs:
               ;;
           esac
 
-          # Lấy 20 dòng cuối của file log (nếu có)
+          # Lấy 20 dòng cuối log
           if [ -n "${{ inputs.summary_file }}" ] && [ -f "${{ inputs.summary_file }}" ]; then
             SUMMARY_RAW=$(tail -n 20 "${{ inputs.summary_file }}" | head -c 2000)
           else
             SUMMARY_RAW="(No log summary available)"
           fi
 
-          # Tạo payload dạng block để hiển thị đẹp trên Slack
+          # Build payload JSON với fallback và text
           jq -n \
             --arg icon "$ICON" \
             --arg stage "${{ inputs.stage }}" \
@@ -96,49 +98,35 @@ jobs:
             --arg summary "$SUMMARY_RAW" \
             --arg color "$COLOR" \
             '{
-              blocks: [
+              text: "\($icon) \($stage) on \($env) — \($text_status)",
+              attachments: [
                 {
-                  type: "section",
-                  text: {
-                    type: "mrkdwn",
-                    text: "\($icon) *\($stage)* on *\($env)* — *\($text_status)*"
-                  }
-                },
-                { type: "divider" },
-                {
-                  type: "section",
+                  fallback: "\($stage) on \($env) — \($text_status)",
+                  color: $color,
                   fields: [
-                    { type: "mrkdwn", text: "*Repository:*\n\($repo)" },
-                    { type: "mrkdwn", text: "*Triggered by:*\n\($actor)" },
-                    { type: "mrkdwn", text: "*Environment:*\n\($env)" },
-                    { type: "mrkdwn", text: "*Status:*\n\($text_status)" }
+                    {title: "Repository", value: $repo, short: true},
+                    {title: "Triggered by", value: $actor, short: true},
+                    {title: "Environment", value: $env, short: true},
+                    {title: "Status", value: $text_status, short: true},
+                    {title: "Workflow Run", value: "<\($run_url)|View Details>", short: false}
                   ]
                 },
                 {
-                  type: "section",
-                  text: { type: "mrkdwn", text: "*Workflow Run:*\n<\($run_url)|View Details>" }
-                },
-                { type: "divider" },
-                {
-                  type: "section",
-                  text: {
-                    type: "mrkdwn",
-                    text: "*Last 20 lines of log:*\n```\n\($summary)\n```"
-                  }
+                  color: "#36a64f",
+                  title: "Last 20 lines of log:",
+                  text: $summary,
+                  mrkdwn_in: ["text"]
                 }
-              ],
-              attachments: [
-                { color: $color }
               ]
             }' > slack_payload.json
 
           echo "✅ Slack payload generated:"
           cat slack_payload.json | jq .
 
-      - name: Send message to Slack
+      - name: Send Slack message
         uses: slackapi/slack-github-action@v1.27.0
         with:
-          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
+          channel-id: ${{ inputs.channel_id }}
           payload-file-path: slack_payload.json
           payload-file-path-parsed: true
         env:
