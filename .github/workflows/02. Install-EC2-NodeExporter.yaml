@@ -30,7 +30,7 @@ jobs:
         id: getip
         run: |
           IP=$(jq -r '.resources[] | select(.type=="aws_instance") | .instances[0].attributes.public_ip' terraform.tfstate)
-          echo "EC2_IP=$IP" >> $GITHUB_ENV
+          echo "EC2_IP=$IP" >> $GITHUB_ENV        
 
 
       - name: Install Node Exporter via SSH
@@ -66,3 +66,4 @@ jobs:
             sudo systemctl daemon-reload
             sudo systemctl enable --now node_exporter
             sudo systemctl start node_exporter
+    
