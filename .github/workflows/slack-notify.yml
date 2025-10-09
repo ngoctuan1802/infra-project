@@ -30,14 +30,14 @@ on:
         default: ''
         description: 'Path to log file to include in notification'
     secrets:
-      SLACK_WEBHOOK_URL:
+      SLACK_BOT_TOKEN:
         required: true
 
 jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Download artifacts (if summary file specified)
+      - name: Download logs (if specified)
         if: inputs.summary_file != ''
         uses: actions/download-artifact@v4
         with:
@@ -50,56 +50,90 @@ jobs:
         shell: bash
         run: |
           STATUS="${{ inputs.status }}"
+
+          # Xác định icon và màu theo trạng thái
           case "$STATUS" in
-            success) ICON=":white_check_mark:"; COLOR="good"; TEXT_STATUS="Success";;
-            failure) ICON=":x:"; COLOR="danger"; TEXT_STATUS="Failed";;
-            cancelled) ICON=":warning:"; COLOR="warning"; TEXT_STATUS="Cancelled";;
-            *) ICON=":grey_question:"; COLOR="#808080"; TEXT_STATUS="Unknown";;
+            success)
+              ICON=":white_check_mark:"
+              COLOR="#2eb886"
+              TEXT_STATUS="Success"
+              ;;
+            failure)
+              ICON=":x:"
+              COLOR="#e01e5a"
+              TEXT_STATUS="Failed"
+              ;;
+            cancelled)
+              ICON=":warning:"
+              COLOR="#daa038"
+              TEXT_STATUS="Cancelled"
+              ;;
+            *)
+              ICON=":grey_question:"
+              COLOR="#808080"
+              TEXT_STATUS="Unknown"
+              ;;
           esac
 
+          # Lấy 20 dòng cuối của file log (nếu có)
           if [ -n "${{ inputs.summary_file }}" ] && [ -f "${{ inputs.summary_file }}" ]; then
             SUMMARY_RAW=$(tail -n 20 "${{ inputs.summary_file }}" | head -c 2000)
-            SUMMARY_TEXT="```\n${SUMMARY_RAW}\n```"
           else
-            SUMMARY_TEXT="(No log summary available)"
+            SUMMARY_RAW="(No log summary available)"
           fi
 
+          # Tạo payload dạng block để hiển thị đẹp trên Slack
           jq -n \
             --arg icon "$ICON" \
             --arg stage "${{ inputs.stage }}" \
             --arg env "${{ inputs.environment }}" \
             --arg text_status "$TEXT_STATUS" \
-            --arg color "$COLOR" \
             --arg repo "${{ inputs.repository }}" \
             --arg actor "${{ inputs.actor }}" \
             --arg run_url "${{ inputs.run_url }}" \
-            --arg summary "$SUMMARY_TEXT" \
+            --arg summary "$SUMMARY_RAW" \
+            --arg color "$COLOR" \
             '{
-              text: "\($icon) *\($stage)* on *\($env)* — *\($text_status)*",
-              attachments: [
+              blocks: [
                 {
-                  color: $color,
+                  type: "section",
+                  text: {
+                    type: "mrkdwn",
+                    text: "\($icon) *\($stage)* on *\($env)* — *\($text_status)*"
+                  }
+                },
+                { type: "divider" },
+                {
+                  type: "section",
                   fields: [
-                    {title: "Repository", value: $repo, short: true},
-                    {title: "Triggered by", value: $actor, short: true},
-                    {title: "Environment", value: $env, short: true},
-                    {title: "Status", value: $text_status, short: true},
-                    {title: "Workflow Run", value: "<\($run_url)|View Details>", short: false}
+                    { type: "mrkdwn", text: "*Repository:*\n\($repo)" },
+                    { type: "mrkdwn", text: "*Triggered by:*\n\($actor)" },
+                    { type: "mrkdwn", text: "*Environment:*\n\($env)" },
+                    { type: "mrkdwn", text: "*Status:*\n\($text_status)" }
                   ]
                 },
                 {
-                  color: "#36a64f",
-                  title: "Last 20 lines of log:",
-                  text: $summary,
-                  mrkdwn_in: ["text"]
+                  type: "section",
+                  text: { type: "mrkdwn", text: "*Workflow Run:*\n<\($run_url)|View Details>" }
+                },
+                { type: "divider" },
+                {
+                  type: "section",
+                  text: {
+                    type: "mrkdwn",
+                    text: "*Last 20 lines of log:*\n```\n\($summary)\n```"
+                  }
                 }
+              ],
+              attachments: [
+                { color: $color }
               ]
             }' > slack_payload.json
 
-          echo "Generated Slack payload:"
+          echo "✅ Slack payload generated:"
           cat slack_payload.json | jq .
 
-      - name: Send Slack notification
+      - name: Send Slack message
         uses: slackapi/slack-github-action@v1.27.0
         with:
           payload-file-path: slack_payload.json

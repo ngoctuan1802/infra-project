@@ -30,8 +30,7 @@ jobs:
           echo -e "\n🔹 Listing S3 buckets..."
           aws s3 ls | tee -a aws-identity.log || echo "❌ Failed to list S3 buckets" | tee -a aws-identity.log
 
-      # Upload logs làm artifact để job Slack có thể tải xuống
-      - name: Upload logs
+      - name: Upload AWS OIDC logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -46,7 +45,7 @@ jobs:
     uses: ./.github/workflows/slack-notify.yml
     with:
       status: ${{ needs.oidc-test.result }}
-      stage: "AWS OIDC Test"
+      stage: "AWS OIDC Authentication Test"
       environment: "staging"
       repository: ${{ github.repository }}
       actor: ${{ github.actor }}
