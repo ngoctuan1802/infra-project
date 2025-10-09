@@ -32,6 +32,8 @@ on:
     secrets:
       SLACK_BOT_TOKEN:
         required: true
+      SLACK_CHANNEL_ID:
+        required: true
 
 jobs:
   notify:
@@ -133,9 +135,11 @@ jobs:
           echo "✅ Slack payload generated:"
           cat slack_payload.json | jq .
 
-      - name: Send Slack message
+      - name: Send message to Slack
         uses: slackapi/slack-github-action@v1.27.0
         with:
+          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
           payload-file-path: slack_payload.json
+          payload-file-path-parsed: true
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
