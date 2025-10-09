@@ -4,7 +4,7 @@ resource "aws_instance" "web" {
   ami           = var.aws_ami
   instance_type = "t3.micro"
   key_name      = "udacity"                      # key_name specifies the name of the SSH key pair to use for accessing the instance.
-  subnet_id     = data.aws_subnets.public.ids[0] # set subnet_id to the first public subnet from the data source defined below.
+  subnet_id     = var.public_subnet_ids[0]       # set subnet_id to the first public subnet from the input variable.
 
   vpc_security_group_ids = [
     aws_security_group.ec2_sg.id,      # Attaches the custom security group defined below.
@@ -12,23 +12,6 @@ resource "aws_instance" "web" {
   ]
   tags = {
     Name = "ubuntu"
-  }
-}
-
-# This data source retrieves information about existing AWS subnets that match the specified filters.
-data "aws_subnets" "public" {
-  # The filter block narrows down the search criteria for the subnets.
-  filter {
-    # Filters subnets belonging to a specific VPC ID, provided by the "vpc_id" variable.
-    name   = "vpc-id"
-    values = [var.vpc_id]
-  }
-
-  filter {
-    # Filters subnets based on their "Name" tag.
-    # The wildcards (*) match any subnet whose name contains the word "public".
-    name   = "tag:Name"
-    values = ["*public*"]
   }
 }
 

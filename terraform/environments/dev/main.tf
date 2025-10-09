@@ -47,6 +47,7 @@ module "project_ec2" {
   account            = data.aws_caller_identity.current.account_id
   aws_ami            = "ami-03f0e0a27c8814eaf"
   private_subnet_ids = module.vpc.private_subnets
+  public_subnet_ids  = module.vpc.public_subnets
   vpc_id             = module.vpc.vpc_id
 }
 
