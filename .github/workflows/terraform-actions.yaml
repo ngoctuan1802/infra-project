@@ -65,13 +65,13 @@ jobs:
           fi
 
   slack-notify:
-    name: Notify Slack
+    name: Notify Slack about Terraform ${{ github.event.inputs.action }} - ${{ github.event.inputs.environment }}
     needs: terraform
     if: always()
     uses: ./.github/workflows/slack-notify.yml
     with:
       status: ${{ needs.terraform.result }}
-      stage: "AWS OIDC Test"
+      stage: "Terraform ${{ github.event.inputs.action }} on ${{ github.event.inputs.environment }}"
       environment: ${{ github.event.inputs.environment }}
       repository: ${{ github.repository }}
       actor: ${{ github.actor }}
