@@ -53,3 +53,4 @@ jobs:
       summary_file: aws-identity.log
     secrets:
       SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+      SLACK_CHANNEL_ID: C094M3H5G59
