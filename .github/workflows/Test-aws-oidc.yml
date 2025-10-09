@@ -5,31 +5,32 @@ on:
 
 jobs:
   oidc-test:
+    name: AWS OIDC Authentication Test
     runs-on: ubuntu-latest
     permissions:
       id-token: write
       contents: read
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials via OIDC
+      - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::491085416582:role/GitHubActions-Role
           aws-region: us-east-2
 
-      - name: Verify identity
+      - name: Verify AWS identity
         id: verify
         run: |
-          echo "Testing AWS OIDC authentication..."
+          echo "🔹 Testing AWS OIDC authentication..."
           aws sts get-caller-identity | tee aws-identity.log
-          
-          echo "Listing S3 buckets..."
-          aws s3 ls | tee -a aws-identity.log || echo "Failed to list S3 buckets" | tee -a aws-identity.log
 
-      # Upload logs làm artifact để slack-notify có thể đọc
+          echo -e "\n🔹 Listing S3 buckets..."
+          aws s3 ls | tee -a aws-identity.log || echo "❌ Failed to list S3 buckets" | tee -a aws-identity.log
+
+      # Upload logs làm artifact để job Slack có thể tải xuống
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -44,12 +45,12 @@ jobs:
     if: always()
     uses: ./.github/workflows/slack-notify.yml
     with:
-      status: ${{ needs.oidc-test.result }}  # ✅ Sửa lại đúng job name
+      status: ${{ needs.oidc-test.result }}
       stage: "AWS OIDC Test"
       environment: "staging"
       repository: ${{ github.repository }}
       actor: ${{ github.actor }}
       run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-      summary_file: aws-identity.log  # File này sẽ được download từ artifact
+      summary_file: aws-identity.log
     secrets:
       SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
