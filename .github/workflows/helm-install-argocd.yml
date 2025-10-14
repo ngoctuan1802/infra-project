@@ -31,9 +31,10 @@ jobs:
       run: |
         CLUSTER_NAME=$(jq -r '.resources[] 
           | select(.type=="aws_eks_cluster") 
-          | .instances[0].attributes.name' terraform.tfstate | tr -d '\n')
+          | .instances[0].attributes.name' terraform.tfstate)
         echo "Cluster found: $CLUSTER_NAME"
-        echo "EKS_CLUSTER_NAME=$CLUSTER_NAME" >> $GITHUB_ENV
+        printf "EKS_CLUSTER_NAME=%s" "$CLUSTER_NAME" >> $GITHUB_ENV
+
 
 
     - name: Setup kubectl
