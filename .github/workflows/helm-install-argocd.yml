@@ -53,7 +53,7 @@ jobs:
 
       - name: Update kubeconfig for EKS
         run: |
-          aws eks update-kubeconfig --region ${{ vars.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
+          aws eks update-kubeconfig --region ${{ vars.AWS_REGION }} --name ${{ steps.getcluster.outputs.cluster_name }}
           kubectl get nodes
 
       - name: Add ArgoCD Helm repo and update
