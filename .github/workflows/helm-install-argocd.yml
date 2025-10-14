@@ -31,9 +31,10 @@ jobs:
       run: |
         CLUSTER_NAME=$(jq -r '.resources[] 
           | select(.type=="aws_eks_cluster") 
-          | .instances[0].attributes.name' terraform.tfstate)
-        echo "EKS_CLUSTER_NAME=$CLUSTER_NAME" >> $GITHUB_ENV
+          | .instances[0].attributes.name' terraform.tfstate | tr -d '\n')
         echo "Cluster found: $CLUSTER_NAME"
+        echo "EKS_CLUSTER_NAME=$CLUSTER_NAME" >> $GITHUB_ENV
+
 
     - name: Setup kubectl
       uses: azure/setup-kubectl@v4
@@ -47,7 +48,7 @@ jobs:
 
     - name: Update kubeconfig for EKS
       run: |
-        aws eks update-kubeconfig --region us-west-2 --name ${{ env.EKS_CLUSTER_NAME }}
+        aws eks update-kubeconfig --region ${{ vars.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
         kubectl get nodes
 
     - name: Add ArgoCD Helm repo and update
