@@ -24,23 +24,6 @@ jobs:
         run: |
           aws s3 cp ${{ secrets.TERRAFORM_STATE_S3_URL }} terraform.tfstate
 
-      - name: Get EKS Cluster Name
-        id: getcluster
-        run: |
-          CLUSTER_NAME=$(jq -r '.resources[] | select(.type=="aws_eks_cluster") | .instances[0].attributes.cluster_name // .instances[0].attributes.name' terraform.tfstate)
-          echo "Cluster Name: $CLUSTER_NAME"
-          
-          # Validate cluster name is not empty and doesn't contain invalid chars
-          if [ -z "$CLUSTER_NAME" ] || [ "$CLUSTER_NAME" = "null" ]; then
-            echo "❌ Failed to extract cluster name from terraform state"
-            echo "Debug - Full EKS resources:"
-            jq '.resources[] | select(.type=="aws_eks_cluster")' terraform.tfstate
-            exit 1
-          fi
-          
-          echo "✅ Cluster found: $CLUSTER_NAME"
-          echo "EKS_CLUSTER_NAME=$CLUSTER_NAME" >> $GITHUB_ENV
-
       - name: Setup kubectl
         uses: azure/setup-kubectl@v4
         with:
@@ -53,7 +36,7 @@ jobs:
 
       - name: Update kubeconfig for EKS
         run: |
-          aws eks update-kubeconfig --region ${{ vars.AWS_REGION }} --name ${{ steps.getcluster.outputs.cluster_name }}
+          aws eks update-kubeconfig --region ${{ vars.AWS_REGION }} --name ${{ vars.EKS_CLUSTER_NAME }}
           kubectl get nodes
 
       - name: Add ArgoCD Helm repo and update
