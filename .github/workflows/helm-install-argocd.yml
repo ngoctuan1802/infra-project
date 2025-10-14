@@ -11,75 +11,71 @@ jobs:
       contents: read
 
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-    - name: Configure AWS credentials via OIDC
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-        aws-region: ${{ vars.AWS_REGION }}
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
 
+      - name: Download Terraform state
+        run: |
+          aws s3 cp ${{ secrets.TERRAFORM_STATE_S3_URL }} terraform.tfstate
 
-    - name: Download Terraform state
-      run: |
-        aws s3 cp ${{ secrets.TERRAFORM_STATE_S3_URL }} terraform.tfstate
+      - name: Get EKS Cluster Name
+        id: getcluster
+        run: |
+          CLUSTER_NAME=$(jq -r '.resources[] \
+            | select(.type=="aws_eks_cluster") \
+            | .instances[0].attributes.name' terraform.tfstate)
+          echo "Cluster found: $CLUSTER_NAME"
+          echo "EKS_CLUSTER_NAME=$CLUSTER_NAME" >> $GITHUB_ENV
 
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.30.0'
 
-    - name: Get EKS Cluster Name
-      id: getcluster
-      run: |
-        CLUSTER_NAME=$(jq -r '.resources[] 
-          | select(.type=="aws_eks_cluster") 
-          | .instances[0].attributes.name' terraform.tfstate)
-        echo "Cluster found: $CLUSTER_NAME"
-        printf "EKS_CLUSTER_NAME=%s" "$CLUSTER_NAME" >> $GITHUB_ENV
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.15.0'
 
+      - name: Update kubeconfig for EKS
+        run: |
+          aws eks update-kubeconfig --region ${{ vars.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
+          kubectl get nodes
 
+      - name: Add ArgoCD Helm repo and update
+        run: |
+          helm repo add argo https://argoproj.github.io/argo-helm
+          helm repo update
 
-    - name: Setup kubectl
-      uses: azure/setup-kubectl@v4
-      with:
-        version: 'v1.30.0'
+      - name: Deploy ArgoCD via Helm with custom values
+        run: |
+          helm install argocd argo/argo-cd \
+            --namespace argocd \
+            --create-namespace \
+            --version 8.5.9 \
+            -f argocd/values.yaml
+          echo "✅ ArgoCD deployed successfully via Helm to EKS with custom values!"
 
-    - name: Setup Helm
-      uses: azure/setup-helm@v4
-      with:
-        version: 'v3.15.0'
+      - name: Wait for ArgoCD pods to be ready
+        run: |
+          kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=argocd-server -n argocd --timeout=300s
 
-    - name: Update kubeconfig for EKS
-      run: |
-        aws eks update-kubeconfig --region ${{ vars.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
-        kubectl get nodes
+      - name: Get initial admin password
+        id: password
+        run: |
+          PASSWORD=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d)
+          echo "Initial admin password: $PASSWORD"
+          echo "password=$PASSWORD" >> $GITHUB_OUTPUT
+        shell: bash
 
-    - name: Add ArgoCD Helm repo and update
-      run: |
-        helm repo add argo https://argoproj.github.io/argo-helm
-        helm repo update
-
-    - name: Deploy ArgoCD via Helm with custom values
-      run: |
-        helm install argocd argo/argo-cd \
-          --namespace argocd \
-          --create-namespace \
-          --version 8.5.9 \
-          -f argocd/values.yaml
-        echo "✅ ArgoCD deployed successfully via Helm to EKS with custom values!"
-
-    - name: Wait for ArgoCD pods to be ready
-      run: |
-        kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=argocd-server -n argocd --timeout=300s
-
-    - name: Get initial admin password
-      id: password
-      run: |
-        PASSWORD=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d)
-        echo "Initial admin password: $PASSWORD"
-        echo "password=$PASSWORD" >> $GITHUB_OUTPUT
-      shell: bash
-
-    - name: Output login info
-      run: |
-        echo "To access ArgoCD UI: kubectl port-forward svc/argocd-server -n argocd 8080:443"
-        echo "Then open https://localhost:8080"
-        echo "Username: admin | Password: ${{ steps.password.outputs.password }}"
+      - name: Output login info
+        run: |
+          echo "To access ArgoCD UI: kubectl port-forward svc/argocd-server -n argocd 8080:443"
+          echo "Then open https://localhost:8080"
+          echo "Username: admin | Password: ${{ steps.password.outputs.password }}"
