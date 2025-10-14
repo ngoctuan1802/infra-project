@@ -1,4 +1,4 @@
-name: Slack Notification
+name: 00. Slack Notification
 
 on:
   workflow_call:

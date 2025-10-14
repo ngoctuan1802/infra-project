@@ -38,7 +38,7 @@ jobs:
         with:
           host: ${{ env.EC2_IP }}
           username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }} # hoặc password nếu bạn chọn
+          key: ${{ secrets.EC2_SSH_KEY }} 
           script: |
             wget https://github.com/prometheus/node_exporter/releases/download/v1.8.2/node_exporter-1.8.2.linux-amd64.tar.gz
             tar xvf node_exporter-1.8.2.linux-amd64.tar.gz
@@ -66,4 +66,6 @@ jobs:
             sudo systemctl daemon-reload
             sudo systemctl enable --now node_exporter
             sudo systemctl start node_exporter
-    
+      - name: Output Node Exporter URL
+        run: echo "Node Exporter is running at http://${{ env.EC2_IP }}:9100/metrics"      
+            
