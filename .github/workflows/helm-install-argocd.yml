@@ -1,41 +1,54 @@
 name: Deploy ArgoCD to EKS via Helm
 
 on:
-  workflow_dispatch:  # Cho phép trigger manual từ UI
-
-permissions:
-  contents: read
-  id-token: write  # Yêu cầu cho OIDC auth
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: production  # (Tùy chọn) Thêm approval gate nếu cần
+    permissions:
+      id-token: write
+      contents: read
 
     steps:
     - name: Checkout repo
       uses: actions/checkout@v4
 
-    - name: Configure AWS credentials
+    - name: Configure AWS credentials via OIDC
       uses: aws-actions/configure-aws-credentials@v4
       with:
-        role-to-assume: arn:aws:iam::ACCOUNT_ID:role/GitHubActionsEKSRole  # Thay ACCOUNT_ID và role name
-        aws-region: us-west-2  # Thay region của EKS cluster
+        role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+        aws-region: ${{ vars.AWS_REGION }}
+
+
+    - name: Download Terraform state
+      run: |
+        aws s3 cp ${{ secrets.TERRAFORM_STATE_S3_URL }} terraform.tfstate
+
+
+    - name: Get EKS Cluster Name
+      id: getcluster
+      run: |
+        CLUSTER_NAME=$(jq -r '.resources[] 
+          | select(.type=="aws_eks_cluster") 
+          | .instances[0].attributes.name' terraform.tfstate)
+        echo "EKS_CLUSTER_NAME=$CLUSTER_NAME" >> $GITHUB_ENV
+        echo "Cluster found: $CLUSTER_NAME"
 
     - name: Setup kubectl
       uses: azure/setup-kubectl@v4
       with:
-        version: 'v1.30.0'  # Phiên bản kubectl khớp với EKS
+        version: 'v1.30.0'
 
     - name: Setup Helm
       uses: azure/setup-helm@v4
       with:
-        version: 'v3.15.0'  # Phiên bản Helm ổn định mới nhất 2025
+        version: 'v3.15.0'
 
     - name: Update kubeconfig for EKS
       run: |
-        aws eks update-kubeconfig --region us-west-2 --name my-eks-cluster  # Thay region và cluster name
-        kubectl get nodes  # Verify access
+        aws eks update-kubeconfig --region us-west-2 --name ${{ env.EKS_CLUSTER_NAME }}
+        kubectl get nodes
 
     - name: Add ArgoCD Helm repo and update
       run: |
@@ -47,8 +60,8 @@ jobs:
         helm install argocd argo/argo-cd \
           --namespace argocd \
           --create-namespace \
-          --version 8.5.9 \  # Phiên bản Helm chart mới nhất
-          -f argocd/values.yaml  # Sử dụng file values.yaml từ repo
+          --version 8.5.9 \
+          -f argocd/values.yaml
         echo "✅ ArgoCD deployed successfully via Helm to EKS with custom values!"
 
     - name: Wait for ArgoCD pods to be ready
@@ -66,6 +79,5 @@ jobs:
     - name: Output login info
       run: |
         echo "To access ArgoCD UI: kubectl port-forward svc/argocd-server -n argocd 8080:443"
-        echo "Then open https://localhost:8080 (insecure mode enabled)"
+        echo "Then open https://localhost:8080"
         echo "Username: admin | Password: ${{ steps.password.outputs.password }}"
-        echo "Đổi mật khẩu ngay sau khi login!"

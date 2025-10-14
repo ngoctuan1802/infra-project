@@ -7,9 +7,8 @@ jobs:
   install-node-exporter:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write   # cần cho OIDC
+      id-token: write
       contents: read
-
 
     steps:
       - name: Checkout repo
@@ -18,13 +17,13 @@ jobs:
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::491085416582:role/GitHubActions-Role # get on AWS IAM console
-          aws-region: us-east-2
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.AWS_REGION }}
 
 
       - name: Download Terraform state
         run: |
-          aws s3 cp s3://terraform-state-justin-udacity/terraform/terraform.tfstate terraform.tfstate
+          aws s3 cp ${{ secrets.TERRAFORM_STATE_S3_URL }} terraform.tfstate
 
       - name: Get EC2 Public IP
         id: getip
